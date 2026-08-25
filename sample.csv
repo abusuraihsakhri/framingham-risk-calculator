@@ -1,0 +1,6 @@
+age,sex,tc,hdl,sbp,bp_treated,smoker,diabetic
+45,male,200,50,130,0,0,0
+60,female,250,40,150,1,1,1
+55,male,220,45,135,0,1,0
+35,female,170,65,115,0,0,0
+70,male,280,35,165,1,1,1
