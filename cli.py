@@ -1,100 +1,59 @@
 #!/usr/bin/env python3
-"""
-Command-line interface for the Framingham Risk Score Calculator.
-
-Usage examples:
-
-  Single patient:
-    python cli.py single --age 55 --sex male --tc 210 --hdl 50 \
-                         --sbp 140 --bp-treated --smoker --diabetic
-
-  Batch CSV:
-    python cli.py batch --input patients.csv --output results.csv
-"""
+"""Command-line interface for Framingham 2008 general CVD risk."""
 import argparse
 import json
 import sys
-
-from framingham import calculate_framingham, process_csv
+from framingham import calculate_framingham,process_csv
 
 
 def build_parser():
-    p = argparse.ArgumentParser(
-        prog="framingham",
-        description="Framingham 10-Year Cardiovascular Risk Score Calculator",
-    )
-    sub = p.add_subparsers(dest="cmd")
-
-    # --- single ---
-    s = sub.add_parser("single", help="Calculate risk for a single patient")
-    s.add_argument("--age", type=int, required=True, help="Age (30-74)")
-    s.add_argument("--sex", required=True, choices=["male", "female"],
-                   help="Biological sex")
-    s.add_argument("--tc", type=float, required=True,
-                   help="Total cholesterol (mg/dL)")
-    s.add_argument("--hdl", type=float, required=True,
-                   help="HDL cholesterol (mg/dL)")
-    s.add_argument("--sbp", type=float, required=True,
-                   help="Systolic blood pressure (mmHg)")
-    s.add_argument("--bp-treated", action="store_true", default=False,
-                   help="Patient is on blood pressure medication")
-    s.add_argument("--smoker", action="store_true", default=False,
-                   help="Current smoker")
-    s.add_argument("--diabetic", action="store_true", default=False,
-                   help="Diabetic")
-    s.add_argument("--json", action="store_true", default=False,
-                   help="Output as JSON")
-
-    # --- batch ---
-    b = sub.add_parser("batch", help="Batch-process a CSV file")
-    b.add_argument("-i", "--input", required=True, help="Input CSV path")
-    b.add_argument("-o", "--output", default="results.csv",
-                   help="Output CSV path (default: results.csv)")
-
-    return p
+    parser=argparse.ArgumentParser(prog="framingham",description="Framingham 2008 10-year general CVD (lipid model)")
+    subs=parser.add_subparsers(dest="cmd")
+    single=subs.add_parser("single",help="Assess a CVD-free adult aged 30-74")
+    single.add_argument("--age",required=True,type=int)
+    single.add_argument("--sex",required=True,choices=["male","female"])
+    single.add_argument("--tc",required=True,type=float,help="Total cholesterol mg/dL")
+    single.add_argument("--hdl",required=True,type=float,help="HDL cholesterol mg/dL")
+    single.add_argument("--sbp",required=True,type=float,help="Systolic BP mmHg")
+    single.add_argument("--bp-treated",action="store_true")
+    single.add_argument("--smoker",action="store_true")
+    single.add_argument("--diabetic",action="store_true")
+    single.add_argument("--json",action="store_true")
+    batch=subs.add_parser("batch",help="Process CSV rows")
+    batch.add_argument("-i","--input",required=True)
+    batch.add_argument("-o","--output",default="results.csv")
+    return parser
 
 
 def main(argv=None):
-    parser = build_parser()
-    args = parser.parse_args(argv)
-
+    parser=build_parser()
+    args=parser.parse_args(argv)
     if args.cmd is None:
         parser.print_help()
         return 1
-
-    if args.cmd == "single":
-        result = calculate_framingham(
-            age=args.age,
-            sex=args.sex,
-            total_cholesterol=args.tc,
-            hdl_cholesterol=args.hdl,
-            systolic_bp=args.sbp,
-            bp_treated=args.bp_treated,
-            smoker=args.smoker,
-            diabetic=args.diabetic,
-        )
-        if args.json:
-            print(json.dumps(result, indent=2))
-        else:
-            print(f"Framingham 10-Year CVD Risk Assessment")
-            print(f"{'='*42}")
-            print(f"  Total Points:    {result['total_points']}")
-            print(f"  10-Year Risk:    {result['risk_percent']}%")
-            print(f"  Risk Category:   {result['risk_category']}")
-            print(f"  Breakdown:")
-            for k, v in result["breakdown"].items():
-                label = k.replace("_", " ").title()
-                print(f"    {label:.<30} {v:+d}")
-        return 0
-
-    if args.cmd == "batch":
-        results = process_csv(args.input, args.output)
-        print(f"Processed {len(results)} records -> {args.output}")
-        return 0
-
-    parser.print_help()
-    return 1
+    try:
+        if args.cmd=="batch":
+            rows=process_csv(args.input,args.output)
+            invalid=sum(bool(x["risk_error"]) for x in rows)
+            print(f"Processed {len(rows)} records ({invalid} invalid) -> {args.output}")
+            return 0 if not invalid else 1
+        result=calculate_framingham(args.age,args.sex,args.tc,args.hdl,args.sbp,
+                                   args.bp_treated,args.smoker,args.diabetic)
+    except (ValueError,OSError,OverflowError) as exc:
+        print(f"Error: {exc}",file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(result,indent=2))
+    else:
+        print("Framingham 2008 General CVD (10-year, lipid model)")
+        print(f"  Continuous risk: {result['risk_percent']:.1f}%")
+        print(f"  Point score: {result['total_points']} (tabulated {result['point_risk_label']})")
+        print(f"  Descriptive risk category: {result['risk_category']}")
+        for key,value in result["breakdown"].items():
+            print(f"  {key.replace('_',' '):<25} {value:+d}")
+        print("Educational and research use; not a standalone clinical decision rule.")
+    return 0
 
 
-if __name__ == "__main__":
+if __name__=="__main__":
     sys.exit(main())
