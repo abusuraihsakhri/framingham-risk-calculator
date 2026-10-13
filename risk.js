@@ -83,7 +83,7 @@ if(rows.length>5000)throw Error("Maximum 5,000 CSV rows");
 let errors=0;
 const quote=v=>{
 let s=String(v??"");
-if(/^\s*[=+@-]/.test(s))s="'"+s;
+if(/^\s*[=+@-]/.test(s) && !/^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?\s*$/.test(s))s="'"+s;
 return '"'+s.replace(/"/g,'""')+'"';
 };
 const cols=[...headers,"total_points","risk_percent","risk_category","risk_error"];
