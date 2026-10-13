@@ -1,5 +1,11 @@
 __pycache__/
-*.pyc
+*.py[cod]
 .venv/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 results.csv
 output.csv
+node_modules/
+.DS_Store
