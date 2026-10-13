@@ -17,6 +17,7 @@ Stdlib only — no third-party dependencies.
 # THESE ARE FOR GENERAL CVD, NOT THE OLDER FRAMINGHAM CHD / ATP III SCORES.
 import csv
 import math
+import re
 
 AGE = {
     "male": [0,2,5,6,8,10,11,12,14],
@@ -218,6 +219,15 @@ def process_csv(input_path,output_path):
         results.append(result)
     with open(output_path,"w",newline="",encoding="utf-8") as stream:
         writer=csv.DictWriter(stream,fieldnames=fields+["total_points","risk_percent","risk_category","risk_error"])
-        writer.writeheader()
-        writer.writerows(results)
+        def safe_cell(value):
+            if value is None:
+                return ""
+            s = str(value)
+            if re.match(r"^\\s*[=+@-]", s) and not re.fullmatch(
+                r"\\s*[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?\\s*", s
+            ):
+                return "'" + s
+            return value
+        writer.writerow({k: safe_cell(k) for k in writer.fieldnames})
+        writer.writerows({k: safe_cell(v) for k, v in row.items()} for row in results)
     return results
