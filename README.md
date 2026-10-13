@@ -1,171 +1,48 @@
-# Framingham Risk Calculator
+# Framingham 2008 General CVD Risk Calculator
 
-> **Domain:** Clinical Decision Support & Biomedical Computing  
-> **Reference Guidelines & Standards:** `Standard Clinical Formulations & ISO/IEC Quality Frameworks`
+A zero-dependency Python CLI and static web application estimating **10-year risk of first general cardiovascular disease (CVD)** using the **lipid-based Framingham model of D'Agostino et al. (2008)**. The model is intended for adults aged **30–74 without established CVD**.
 
-<div align="center">
+This is **not** the ATP III hard-coronary-heart-disease score, the 1998 Framingham CHD score, or a contemporary ASCVD/PREVENT calculator.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
+## Browser application
 
-</div>
+Open **index.html** in a modern browser. GitHub Pages deployment is configured through **.github/workflows/pages.yml**; a verified live URL will be added after GitHub Pages is enabled and deployment is confirmed.
 
----
+The static site supports single-person risk calculations and local CSV input/output (2 MB, maximum 5,000 rows). The webpage does not send patient data to a remote service, call external APIs, or store calculations in browser storage. Static hosting providers may log ordinary page requests. Do not include identifiable patient information when sharing exported CSVs.
 
-## 📖 What It Does
+## Python CLI
 
-Framingham Risk Score Calculator — 10-Year Cardiovascular Disease Risk.
+Python **3.10+**, standard library only; no installation required.
 
-Implements the sex-specific point-based model from:
-  D'Agostino RB Sr, Vasan RS, Pencina MJ, et al.
-  "General Cardiovascular Risk Profile for Use in Primary Care."
-  Circulation. 2008;111(6):751-756.
+~~~bash
+python cli.py single --age 55 --sex male --tc 220 --hdl 45 --sbp 135 --smoker --json
+python cli.py batch --input sample.csv --output results.csv
+python -m unittest discover -v
+~~~
 
-Valid for ages 30-74. Uses lipids, blood pressure (treated vs untreated),
-smoking status, and diabetes status.
+Use **mg/dL** for total and HDL cholesterol, **mmHg** for systolic blood pressure. Optional flags **--bp-treated**, **--smoker**, **--diabetic** default to false. Running **python cli.py** with no subcommand prints help.
 
-Stdlib only — no third-party dependencies.
+CSV headers: **age,sex,tc,hdl,sbp** (alternatively **total_cholesterol**, **hdl_cholesterol**, **systolic_bp**); optional **bp_treated,smoker,diabetic**, accepted as yes/no, true/false or 1/0. Invalid rows are marked **ERROR** with a **risk_error** explanation. The batch command returns exit code 1 if any row fails.
 
----
+## Algorithm and interpretation
 
-## ⚙️ Key Capabilities & Algorithmic Modules
+**calculate_framingham()** returns an individual estimate via the continuous **2008 lipid-based Cox regression** (**risk_percent**, one decimal place). It additionally reports the **separate approximate published point-score model** (**total_points**, **breakdown**, **point_risk_percent**, **point_risk_label**). The point-table value can differ from the continuous estimate due to discretization and may be censored as less than 1% or greater than 30%; the numeric point-table value is then **None**.
 
-### 🔬 Analytical Functions
+The returned **risk_category** convention is low (below 10%), intermediate (10–20%), high (above 20%). **These descriptive categories are not treatment thresholds.** The original derivation cohort may not calibrate to modern, diverse populations; consider current applicable guidance and patient-specific factors when interpreting an estimate.
 
-- **`calculate_points()`**: Compute the Framingham Risk Score point total.
+**Clinical sources**
 
-Parameters
-----------
-age : int
-    Patient age (30-74).
-sex : str
-    "male" or "female" (case-insensitive).
-total_cholesterol : float
-    Total cholesterol in mg/dL.
-hdl_cholesterol : float
-    HDL cholesterol in mg/dL.
-systolic_bp : float
-    Systolic blood pressure in mmHg.
-bp_treated : bool
-    Whether the patient is on BP medication.
-smoker : bool
-    Current smoker status.
-diabetic : bool
-    Diabetes status.
+- D'Agostino RB Sr et al. *General cardiovascular risk profile for use in primary care.* Circulation. 2008;117:743–753. [DOI:10.1161/CIRCULATIONAHA.107.699579](https://doi.org/10.1161/CIRCULATIONAHA.107.699579).
+- D'Agostino RB Sr et al. *Cardiovascular disease risk assessment: insights from Framingham.* Glob Heart. 2013;8:11–23. [PMCID:PMC3673738](https://pmc.ncbi.nlm.nih.gov/articles/PMC3673738/).
 
-Returns
--------
-int
-    Total Framingham points.
-- **`points_to_risk()`**: Convert a point total to a 10-year CVD risk percentage.
+## Testing and deployment
 
-Returns an integer percentage. Points below the table minimum return 1%;
-points above the table maximum return 56% (male) or 30% (female).
-- **`risk_category()`**: Classify risk percentage into Low / Intermediate / High.
+- Python: **python -m unittest discover -v**
+- Browser calculation/CSV: **node --test test_browser.cjs** (Node.js 22 recommended).
+- GitHub Actions runs tests for pull requests and pushes to **master**. The Pages workflow builds a static artifact on **master** and deploys it when Pages is enabled with **GitHub Actions** as its publishing source. No Python server or in-browser Python runtime is required.
 
-Low:          < 10%
-Intermediate: 10-20%
-High:         > 20%
-- **`calculate_framingham()`**: Full Framingham Risk Score calculation.
+Compatible with current Chromium, Firefox and Safari using JavaScript and browser File APIs. No third-party dependencies or build step.
 
-Returns a dict with:
-    total_points    — int, raw point score
-    risk_percent    — int, estimated 10-year CVD risk (%)
-    risk_category   — str, "Low" / "Intermediate" / "High"
-    breakdown       — dict, individual point contributions
-- **`assess_row()`**: Score a single CSV row dict.
+**License:** [MIT](LICENSE).
 
-Expected keys (case-insensitive, flexible):
-    age, sex, total_cholesterol (or tc), hdl_cholesterol (or hdl),
-    systolic_bp (or sbp), bp_treated (or on_bp_meds), smoker,
-    diabetic (or diabetes)
-
----
-
-## 📐 Mathematical Formulation & Logic
-
-```text
-  return (30, 39)
-  return (40, 49)
-  return (50, 59)
-  return (60, 69)
-  return (70, 79)
-```
-
----
-
-## 💻 CLI Quickstart & Usage
-
-### 1. Guided Interactive Mode
-```bash
-python cli.py
-```
-
-### 2. Direct Parameterized Evaluation
-```bash
-python cli.py --age <value> --sex <value> --tc <value> --hdl <value>
-```
-
-### Parameter Reference
-- `--age`: Specifies input measurement or parameter value.
-- `--sex`: Specifies input measurement or parameter value.
-- `--tc`: Specifies input measurement or parameter value.
-- `--hdl`: Specifies input measurement or parameter value.
-- `--sbp`: Specifies input measurement or parameter value.
-- `--bp-treated`: Specifies input measurement or parameter value.
-- `--smoker`: Specifies input measurement or parameter value.
-- `--diabetic`: Specifies input measurement or parameter value.
-- `--input`: Specifies input measurement or parameter value.
-- `--output`: Specifies input measurement or parameter value.
-
-### Input Data Schema
-
-| Field | Description | Requirement |
-|:------|:------------|:------------|
-| `age` | Parameter / observation metric | Required |
-| `sex` | Parameter / observation metric | Required |
-| `tc` | Parameter / observation metric | Required |
-| `hdl` | Parameter / observation metric | Required |
-| `sbp` | Parameter / observation metric | Required |
-| `bp_treated` | Parameter / observation metric | Required |
-| `smoker` | Parameter / observation metric | Required |
-| `diabetic` | Parameter / observation metric | Required |
-
----
-
-## 🛡️ Security & Enterprise Architecture
-
-* **Zero-PHI Outbound Interceptor:** Active AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
-* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
-* **Active Learning Bayesian Calibration:** Dynamic tracker updating worker reliability weights and monitoring Brier calibration drift.
-* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
-
----
-
-## 🧪 Testing & Verification
-
-Run the automated test suite:
-
-```bash
-pytest -v
-```
-
-Execute high-throughput batch simulation benchmarks:
-
-```bash
-python simulator.py --tasks 1000 --concurrency 8
-```
-
----
-
-## 🐳 Container Deployment
-
-```bash
-docker build -t framingham-risk-calculator .
-docker run -p 8000:8000 framingham-risk-calculator
-```
+**For research and education only.** This implementation is not independently validated or approved as stand-alone clinical decision support.
