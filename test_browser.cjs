@@ -42,3 +42,10 @@ test('CSV export protects against spreadsheet formula injection',()=>{
   const x=csvResults('age,sex,tc,hdl,sbp,note\n61,female,230,47,124,"=SUM(1,2)"');
   assert.match(x.csv,/"'=SUM\(1,2\)"/);
 });
+
+test('CSV export preserves legitimate negative numeric point totals',()=>{
+  const x=csvResults('age,sex,tc,hdl,sbp\n30,female,150,65,110');
+  assert.equal(x.errors,0);
+  assert.match(x.csv,/"-5"/);
+  assert.doesNotMatch(x.csv,/"'-5"/);
+});
