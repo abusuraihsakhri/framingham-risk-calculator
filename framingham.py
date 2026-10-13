@@ -223,8 +223,8 @@ def process_csv(input_path,output_path):
             if value is None:
                 return ""
             s = str(value)
-            if re.match(r"^\\s*[=+@-]", s) and not re.fullmatch(
-                r"\\s*[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?\\s*", s
+            if re.match(r"^\s*[=+@-]", s) and not re.fullmatch(
+                r"\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?\s*", s
             ):
                 return "'" + s
             return value
