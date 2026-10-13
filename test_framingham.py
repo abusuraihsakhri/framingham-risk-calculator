@@ -121,5 +121,21 @@ class ClinicalModels(unittest.TestCase):
         self.assertEqual(json.loads(out.getvalue())["total_points"],12)
 
 
+    def test_csv_formula_escaped_and_negative_score_preserved(self):
+        with tempfile.TemporaryDirectory() as folder:
+            src=os.path.join(folder,"src.csv")
+            dst=os.path.join(folder,"out.csv")
+            with open(src,"w",newline="") as stream:
+                writer=csv.writer(stream)
+                writer.writerow(["age","sex","tc","hdl","sbp","note"])
+                writer.writerow([30,"female",150,65,110,"=HYPERLINK(\"https://example.com\")"])
+            rows=process_csv(src,dst)
+            self.assertEqual(rows[0]["total_points"],-5)
+            with open(dst,newline="") as stream:
+                result=list(csv.DictReader(stream))[0]
+            self.assertTrue(result["note"].startswith("'=HYPERLINK"))
+            self.assertEqual(result["total_points"],"-5")
+
+
 if __name__=="__main__":
     unittest.main()
